@@ -1,31 +1,39 @@
-# FrozenLake preliminary analysis
+# FrozenLake Preliminary Analysis
 
-Projet de base pour l’analyse préliminaire du projet RL sur FrozenLake-v1.
+A small Python project for running **FrozenLake** reinforcement-learning experiments end to end: environment setup, training, periodic evaluation, metric export, and plot generation.
 
-## Contenu
-- 3 cas d’étude
-- 2 stratégies baselines : DQN et PPO
-- Entraînement sur plusieurs seeds
-- Sauvegarde des métriques et génération des figures
+## What this project does
 
-## Installation
+This repository compares RL agents on several predefined **FrozenLake-v1** case studies. The codebase is organized to support a simple experimental workflow:
 
-```bash
-pip install -r requirements.txt
+1. define experiment cases and hyperparameters,
+2. train agents,
+3. evaluate them at regular intervals,
+4. save metrics to CSV,
+5. generate plots for analysis/reporting.
+
+### Main outputs
+
+Running the full pipeline produces:
+
+- **tabular results** (CSV metrics over time and summary results),
+- **plots** of key evaluation metrics such as success rate, hole rate, and return.
+
+> **Assumption:** output folders are expected to be created under the project root as `results/` and `figures/`. If your local code currently writes elsewhere, update `src/run_all.py` or follow the printed paths at runtime.
 
 ---
 
-# 11. Comment exécuter le projet
+## Project structure
 
-## Étape 1 — aller dans le dossier du projet
-
-Dans ton terminal :
-
-```bash
-cd frozenlake_prelim
-
-python -m pip install -r requirements.txt
-
-cd src 
-
-python run_all.py
+```text
+frozenlake_prelim/
+├── README.md
+├── requirements.txt
+├── src/
+│   ├── __init__.py
+│   ├── configs.py
+│   ├── envs.py
+│   ├── metrics.py
+│   ├── plotting.py
+│   ├── train_eval.py
+│   └── run_all.py
