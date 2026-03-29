@@ -58,15 +58,6 @@ Lists the Python dependencies required to run the project:
 - numpy
 - pandas
 - matplotlib
-
-#### `methodology_notes.md`
-Contains methodology notes for the report, including:
-- Libraries used
-- Algorithm hyperparameters
-- Experimental protocol
-- Metrics
-- Reproducibility notes
-
 #### `.gitignore`
 Prevents unnecessary files from being tracked by Git, such as:
 - Python cache files
