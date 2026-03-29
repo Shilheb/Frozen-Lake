@@ -1,0 +1,16 @@
+# Python bytecode
+__pycache__/
+*.pyc
+
+# Suggested: virtual environments
+.venv/
+venv/
+env/
+
+# Suggested: editor / OS files
+.DS_Store
+Thumbs.db
+
+# Suggested: generated outputs (only if you do NOT want to track them)
+results/
+figures/
