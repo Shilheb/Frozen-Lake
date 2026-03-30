@@ -1,52 +1,89 @@
 from typing import Dict, List
+
 import numpy as np
+import pandas as pd
 
 
-def tile_type_from_state(desc: List[str], state: int) -> str:
-    ncol = len(desc[0])
-    row, col = divmod(state, ncol)
-    return desc[row][col]
+def _to_discrete_action(action) -> int:
+    """
+    Convertit l'action retournée par SB3 en entier Python compatible
+    avec FrozenLake (espace d'actions discret).
+    """
+    if isinstance(action, np.ndarray):
+        if action.size == 1:
+            return int(action.item())
+        raise ValueError(f"Unexpected action shape for discrete env: {action.shape}")
+    return int(action)
 
 
-def evaluate_model(model, env, desc: List[str], n_episodes: int = 200) -> Dict[str, float]:
-    rewards = []
+def evaluate_model(model, env, n_episodes: int) -> Dict[str, float]:
     successes = []
+    returns = []
     holes = []
     lengths = []
 
     for _ in range(n_episodes):
         obs, _ = env.reset()
-        terminated = False
+        done = False
         truncated = False
-        total_reward = 0.0
-        steps = 0
+        episode_return = 0.0
+        episode_length = 0
         fell_in_hole = 0
 
-        while not (terminated or truncated):
+        while not (done or truncated):
             action, _ = model.predict(obs, deterministic=True)
+            action = _to_discrete_action(action)
 
-            # convertir l'action en int Python
-            if isinstance(action, np.ndarray):
-                action = int(action.item())
-            else:
-                action = int(action)
+            obs, reward, done, truncated, _ = env.step(action)
 
-            obs, reward, terminated, truncated, _ = env.step(action)
-            total_reward += reward
-            steps += 1
+            episode_return += float(reward)
+            episode_length += 1
 
-            if terminated and reward == 0:
-                if tile_type_from_state(desc, int(obs)) == "H":
-                    fell_in_hole = 1
+            if done and reward == 0.0:
+                fell_in_hole = 1
 
-        rewards.append(total_reward)
-        successes.append(1 if total_reward > 0 else 0)
+        successes.append(1 if episode_return > 0 else 0)
+        returns.append(episode_return)
         holes.append(fell_in_hole)
-        lengths.append(steps)
+        lengths.append(episode_length)
 
     return {
-        "eval_return_mean": float(np.mean(rewards)),
-        "eval_success_rate": float(np.mean(successes)),
-        "eval_hole_rate": float(np.mean(holes)),
-        "eval_episode_length_mean": float(np.mean(lengths)),
+        "success_rate": float(np.mean(successes)),
+        "avg_return": float(np.mean(returns)),
+        "hole_rate": float(np.mean(holes)),
+        "avg_episode_length": float(np.mean(lengths)),
     }
+
+
+def aggregate_with_confidence_intervals(raw_df: pd.DataFrame) -> pd.DataFrame:
+    metric_cols = [
+        "success_rate",
+        "avg_return",
+        "hole_rate",
+        "avg_episode_length",
+    ]
+
+    grouped = raw_df.groupby(["case", "algo", "timestep"], as_index=False)
+
+    rows: List[Dict[str, float]] = []
+    for (case_name, algo_name, timestep), group in grouped:
+        row: Dict[str, float] = {
+            "case": case_name,
+            "algo": algo_name,
+            "timestep": int(timestep),
+            "n_seeds": int(len(group)),
+        }
+
+        for metric in metric_cols:
+            values = group[metric].to_numpy(dtype=float)
+            mean = float(np.mean(values))
+            std = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
+            ci95 = float(1.96 * std / np.sqrt(len(values))) if len(values) > 1 else 0.0
+
+            row[f"{metric}_mean"] = mean
+            row[f"{metric}_std"] = std
+            row[f"{metric}_ci95"] = ci95
+
+        rows.append(row)
+
+    return pd.DataFrame(rows).sort_values(["case", "algo", "timestep"]).reset_index(drop=True)

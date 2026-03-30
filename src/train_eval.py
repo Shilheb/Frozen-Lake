@@ -1,73 +1,65 @@
-from __future__ import annotations
-
-from dataclasses import asdict
-from pathlib import Path
-from typing import Dict, List
+import random
+from typing import Dict, List, Type
 
 import numpy as np
 import pandas as pd
+import torch
+from stable_baselines3 import DQN, PPO
 
-from configs import ALGO_CONFIGS, CASE_CONFIGS, EVAL_EPISODES, EVAL_INTERVAL, SEEDS, TOTAL_TIMESTEPS
+from configs import EVAL_EPISODES, EVAL_INTERVAL, TOTAL_TIMESTEPS, AlgoConfig, CaseConfig
 from envs import make_env
 from metrics import evaluate_model
 
-# Imports kept inside function to make module import cheaper when dependencies are missing.
+
+ALGO_CLASS = {
+    "DQN": DQN,
+    "PPO": PPO,
+}
 
 
-def _build_model(algo_name: str, policy: str, env, seed: int, params: Dict):
-    if algo_name == "DQN":
-        from stable_baselines3 import DQN
-        return DQN(policy, env, seed=seed, **params)
-    if algo_name == "PPO":
-        from stable_baselines3 import PPO
-        return PPO(policy, env, seed=seed, **params)
-    raise ValueError(f"Unsupported algorithm: {algo_name}")
+def set_global_seed(seed: int) -> None:
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
 
 
-def run_experiment(output_dir: str = "results") -> pd.DataFrame:
-    out = Path(output_dir)
-    out.mkdir(parents=True, exist_ok=True)
+def train_and_evaluate_case(case_cfg: CaseConfig, algo_cfg: AlgoConfig, seed: int):
+    set_global_seed(seed)
 
-    all_rows: List[Dict] = []
+    train_env = make_env(case_cfg)
+    eval_env = make_env(case_cfg)
 
-    for case in CASE_CONFIGS:
-        for algo in ALGO_CONFIGS:
-            total_timesteps = TOTAL_TIMESTEPS[case.name]
-
-            for seed in SEEDS:
-                env = make_env(case)
-                model = _build_model(algo.name, algo.policy, env, seed, algo.params.copy())
-
-                for current_step in range(EVAL_INTERVAL, total_timesteps + 1, EVAL_INTERVAL):
-                    model.learn(total_timesteps=EVAL_INTERVAL, reset_num_timesteps=False, progress_bar=False)
-                    eval_env = make_env(case)
-                    metrics = evaluate_model(model, eval_env, case.desc, n_episodes=EVAL_EPISODES)
-                    row = {
-                        "case": case.name,
-                        "algorithm": algo.name,
-                        "seed": seed,
-                        "timesteps": current_step,
-                        **metrics,
-                    }
-                    all_rows.append(row)
-                    eval_env.close()
-
-                env.close()
-
-    df = pd.DataFrame(all_rows)
-    df.to_csv(out / "metrics_long.csv", index=False)
-
-    summary = (
-        df.sort_values("timesteps")
-        .groupby(["case", "algorithm", "seed"], as_index=False)
-        .tail(1)
-        .groupby(["case", "algorithm"], as_index=False)
-        .agg(
-            eval_return_mean=("eval_return_mean", "mean"),
-            eval_success_rate=("eval_success_rate", "mean"),
-            eval_hole_rate=("eval_hole_rate", "mean"),
-            eval_episode_length_mean=("eval_episode_length_mean", "mean"),
-        )
+    algo_class: Type = ALGO_CLASS[algo_cfg.name]
+    model = algo_class(
+        policy=algo_cfg.policy,
+        env=train_env,
+        seed=seed,
+        **algo_cfg.params,
     )
-    summary.to_csv(out / "summary.csv", index=False)
-    return df
+
+    total_timesteps = TOTAL_TIMESTEPS[case_cfg.name]
+    evaluation_steps: List[int] = list(range(EVAL_INTERVAL, total_timesteps + 1, EVAL_INTERVAL))
+
+    rows: List[Dict] = []
+
+    learned_so_far = 0
+    for step_target in evaluation_steps:
+        additional_steps = step_target - learned_so_far
+        model.learn(total_timesteps=additional_steps, reset_num_timesteps=False, progress_bar=False)
+        learned_so_far = step_target
+
+        metrics = evaluate_model(model, eval_env, n_episodes=EVAL_EPISODES)
+
+        row = {
+            "case": case_cfg.name,
+            "algo": algo_cfg.name,
+            "seed": seed,
+            "timestep": step_target,
+        }
+        row.update(metrics)
+        rows.append(row)
+
+    train_env.close()
+    eval_env.close()
+
+    return pd.DataFrame(rows), model

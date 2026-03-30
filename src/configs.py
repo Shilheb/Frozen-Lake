@@ -96,11 +96,17 @@ ALGO_CONFIGS = [
     ),
 ]
 
-SEEDS = [0]
+SEEDS = [0, 1, 2, 3, 4]
+
 TOTAL_TIMESTEPS = {
     "case1_deterministic_4x4": 30000,
     "case2_slippery_4x4": 60000,
     "case3_hard_slippery_8x8": 120000,
 }
+
+EVAL_INTERVAL = 2000
 EVAL_EPISODES = 200
-EVAL_INTERVAL = 2_000
+
+OUTPUT_DIR = "../outputs"
+RAW_METRICS_FILENAME = "raw_metrics.csv"
+AGG_METRICS_FILENAME = "aggregated_metrics.csv"

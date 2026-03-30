@@ -1,15 +1,24 @@
 import gymnasium as gym
-from gymnasium.wrappers import TimeLimit
+
 from configs import CaseConfig
 
 
-def make_env(case: CaseConfig):
+def _get_max_episode_steps(case_name: str) -> int:
+    if "8x8" in case_name:
+        return 200
+    return 100
+
+
+def make_env(case_cfg: CaseConfig):
     env = gym.make(
         "FrozenLake-v1",
-        desc=case.desc,
-        is_slippery=case.is_slippery,
-        success_rate=case.success_rate,
+        desc=case_cfg.desc,
+        is_slippery=case_cfg.is_slippery,
+        success_rate=case_cfg.success_rate,
     )
-    max_steps = 100 if len(case.desc) == 4 else 200
-    env = TimeLimit(env, max_episode_steps=max_steps)
+
+    env = gym.wrappers.TimeLimit(
+        env,
+        max_episode_steps=_get_max_episode_steps(case_cfg.name),
+    )
     return env
