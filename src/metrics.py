@@ -4,86 +4,117 @@ import numpy as np
 import pandas as pd
 
 
-def _to_discrete_action(action) -> int:
-    """
-    Convertit l'action retournée par SB3 en entier Python compatible
-    avec FrozenLake (espace d'actions discret).
-    """
-    if isinstance(action, np.ndarray):
-        if action.size == 1:
-            return int(action.item())
-        raise ValueError(f"Unexpected action shape for discrete env: {action.shape}")
-    return int(action)
+def tile_type_from_state(desc: List[str], state: int) -> str:
+    """Retourne le type de case: S, F, H ou G."""
+    n_cols = len(desc[0])
+    row, col = divmod(int(state), n_cols)
+    return desc[row][col]
 
 
-def evaluate_model(model, env, n_episodes: int) -> Dict[str, float]:
+def evaluate_model(
+    model,
+    env,
+    desc: List[str],
+    n_episodes: int = 200,
+    deterministic: bool = True,
+) -> Dict[str, float]:
+    """
+    Évalue une politique sur plusieurs épisodes.
+
+    L'évaluation utilise l'environnement standard, pas la récompense pénalisée
+    de DQN-Safe, afin de comparer équitablement les algorithmes.
+    """
+
+    rewards = []
     successes = []
-    returns = []
     holes = []
     lengths = []
 
-    for _ in range(n_episodes):
-        obs, _ = env.reset()
-        done = False
+    for episode_idx in range(n_episodes):
+        obs, _ = env.reset(seed=episode_idx)
+
+        terminated = False
         truncated = False
-        episode_return = 0.0
-        episode_length = 0
+        total_reward = 0.0
+        steps = 0
         fell_in_hole = 0
+        reached_goal = 0
 
-        while not (done or truncated):
-            action, _ = model.predict(obs, deterministic=True)
-            action = _to_discrete_action(action)
+        while not (terminated or truncated):
+            action, _ = model.predict(obs, deterministic=deterministic)
+            action = int(action.item()) if isinstance(action, np.ndarray) else int(action)
 
-            obs, reward, done, truncated, _ = env.step(action)
+            obs, reward, terminated, truncated, _ = env.step(action)
 
-            episode_return += float(reward)
-            episode_length += 1
+            total_reward += float(reward)
+            steps += 1
 
-            if done and reward == 0.0:
-                fell_in_hole = 1
+            if terminated:
+                tile = tile_type_from_state(desc, int(obs))
+                if tile == "H":
+                    fell_in_hole = 1
+                elif tile == "G":
+                    reached_goal = 1
 
-        successes.append(1 if episode_return > 0 else 0)
-        returns.append(episode_return)
+        rewards.append(total_reward)
+        successes.append(reached_goal)
         holes.append(fell_in_hole)
-        lengths.append(episode_length)
+        lengths.append(steps)
 
     return {
-        "success_rate": float(np.mean(successes)),
-        "avg_return": float(np.mean(returns)),
-        "hole_rate": float(np.mean(holes)),
-        "avg_episode_length": float(np.mean(lengths)),
+        "eval_return_mean": float(np.mean(rewards)),
+        "eval_success_rate": float(np.mean(successes)),
+        "eval_hole_rate": float(np.mean(holes)),
+        "eval_episode_length_mean": float(np.mean(lengths)),
     }
 
 
-def aggregate_with_confidence_intervals(raw_df: pd.DataFrame) -> pd.DataFrame:
-    metric_cols = [
-        "success_rate",
-        "avg_return",
-        "hole_rate",
-        "avg_episode_length",
-    ]
+def aggregate_with_confidence_intervals(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Agrège les résultats sur les graines et calcule un intervalle de confiance à 95%.
 
-    grouped = raw_df.groupby(["case", "algo", "timestep"], as_index=False)
+    Colonnes produites pour plotting.py:
+        avg_return_mean / avg_return_ci95
+        success_rate_mean / success_rate_ci95
+        hole_rate_mean / hole_rate_ci95
+        avg_episode_length_mean / avg_episode_length_ci95
+    """
 
-    rows: List[Dict[str, float]] = []
-    for (case_name, algo_name, timestep), group in grouped:
-        row: Dict[str, float] = {
-            "case": case_name,
-            "algo": algo_name,
-            "timestep": int(timestep),
-            "n_seeds": int(len(group)),
+    group_cols = ["case", "algo", "timestep"]
+
+    metric_map = {
+        "eval_return_mean": "avg_return",
+        "eval_success_rate": "success_rate",
+        "eval_hole_rate": "hole_rate",
+        "eval_episode_length_mean": "avg_episode_length",
+    }
+
+    rows = []
+
+    for keys, group in df.groupby(group_cols):
+        case, algo, timestep = keys
+        n = group["seed"].nunique()
+
+        row = {
+            "case": case,
+            "algo": algo,
+            "timestep": timestep,
+            "n_seeds": n,
         }
 
-        for metric in metric_cols:
-            values = group[metric].to_numpy(dtype=float)
-            mean = float(np.mean(values))
-            std = float(np.std(values, ddof=1)) if len(values) > 1 else 0.0
-            ci95 = float(1.96 * std / np.sqrt(len(values))) if len(values) > 1 else 0.0
+        for raw_metric, clean_name in metric_map.items():
+            mean = group[raw_metric].mean()
+            std = group[raw_metric].std(ddof=1)
 
-            row[f"{metric}_mean"] = mean
-            row[f"{metric}_std"] = std
-            row[f"{metric}_ci95"] = ci95
+            if n > 1 and not np.isnan(std):
+                ci95 = 1.96 * std / np.sqrt(n)
+            else:
+                ci95 = 0.0
+
+            row[f"{clean_name}_mean"] = float(mean)
+            row[f"{clean_name}_std"] = float(std) if not np.isnan(std) else 0.0
+            row[f"{clean_name}_ci95"] = float(ci95)
 
         rows.append(row)
 
-    return pd.DataFrame(rows).sort_values(["case", "algo", "timestep"]).reset_index(drop=True)
+    return pd.DataFrame(rows)

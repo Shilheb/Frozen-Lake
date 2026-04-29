@@ -94,6 +94,26 @@ ALGO_CONFIGS = [
             verbose=0,
         ),
     ),
+
+        AlgoConfig(
+        name="DQN-Safe",
+        policy="MlpPolicy",
+        params=dict(
+            learning_rate=1e-3,
+            buffer_size=50000,
+            learning_starts=1000,
+            batch_size=64,
+            tau=1.0,
+            gamma=0.99,
+            train_freq=4,
+            gradient_steps=1,
+            target_update_interval=1000,
+            exploration_fraction=0.30,
+            exploration_initial_eps=1.0,
+            exploration_final_eps=0.05,
+            verbose=0,
+        ),
+    ),
 ]
 
 SEEDS = [0, 1, 2, 3, 4]
@@ -108,5 +128,5 @@ EVAL_INTERVAL = 2000
 EVAL_EPISODES = 200
 
 OUTPUT_DIR = "../outputs"
-RAW_METRICS_FILENAME = "raw_metrics.csv"
-AGG_METRICS_FILENAME = "aggregated_metrics.csv"
+RAW_METRICS_FILENAME = "raw_metrics_dqn_safe.csv"
+AGG_METRICS_FILENAME = "aggregated_metrics_dqn_safe.csv"

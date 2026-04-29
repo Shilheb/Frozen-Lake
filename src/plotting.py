@@ -110,11 +110,32 @@ def _draw_grid_policy(ax, desc, policy_dict, title: str) -> None:
     ax.set_yticklabels([])
 
 
-def plot_policy_comparison(case_name: str, desc, dqn_policy, ppo_policy, output_path: str) -> None:
-    fig, axes = plt.subplots(1, 2, figsize=(10, 5))
+def plot_policy_comparison(case_name: str, desc, policies: dict, output_path: str) -> None:
+    """
+    Visualise les politiques finales apprises pour un cas donné.
 
-    _draw_grid_policy(axes[0], desc, dqn_policy, f"{case_name} — Politique DQN")
-    _draw_grid_policy(axes[1], desc, ppo_policy, f"{case_name} — Politique PPO")
+    Cette version accepte un dictionnaire de politiques:
+        {"DQN-Safe": policy}
+    ou éventuellement:
+        {"DQN": policy, "PPO": policy, "DQN-Safe": policy}
+    """
+
+    if not policies:
+        raise ValueError(f"Aucune politique fournie pour le cas {case_name}.")
+
+    algo_names = list(policies.keys())
+    n_algos = len(algo_names)
+
+    fig, axes = plt.subplots(1, n_algos, figsize=(5 * n_algos, 5), squeeze=False)
+    axes = axes[0]
+
+    for ax, algo_name in zip(axes, algo_names):
+        _draw_grid_policy(
+            ax=ax,
+            desc=desc,
+            policy_dict=policies[algo_name],
+            title=f"{case_name} — Politique {algo_name}",
+        )
 
     fig.tight_layout()
     os.makedirs(os.path.dirname(output_path), exist_ok=True)

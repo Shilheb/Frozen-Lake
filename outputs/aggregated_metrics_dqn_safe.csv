@@ -1,4 +1,4 @@
-case,algo,timestep,n_seeds,avg_return_mean,avg_return_std,avg_return_ci95,success_rate_mean,success_rate_std,success_rate_ci95,hole_rate_mean,hole_rate_std,hole_rate_ci95,avg_length_mean,avg_length_std,avg_length_ci95
+case,algo,timestep,n_seeds,avg_return_mean,avg_return_std,avg_return_ci95,success_rate_mean,success_rate_std,success_rate_ci95,hole_rate_mean,hole_rate_std,hole_rate_ci95,avg_episode_length_mean,avg_episode_length_std,avg_episode_length_ci95
 case1_deterministic_4x4,DQN-Safe,2000,5,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,100.0,0.0,0.0
 case1_deterministic_4x4,DQN-Safe,4000,5,0.4,0.5477225575051662,0.480099989585503,0.4,0.5477225575051662,0.480099989585503,0.0,0.0,0.0,62.4,51.485920405485615,45.129399021037266
 case1_deterministic_4x4,DQN-Safe,6000,5,0.4,0.5477225575051662,0.480099989585503,0.4,0.5477225575051662,0.480099989585503,0.0,0.0,0.0,62.4,51.485920405485615,45.129399021037266

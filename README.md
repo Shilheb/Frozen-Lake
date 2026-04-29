@@ -34,7 +34,6 @@ For each case, the code trains the selected algorithms, evaluates them periodica
 Frozen-Lake/
 ├── .gitignore
 ├── README.md
-├── methodology_notes.md
 ├── requirements.txt
 └── src/
     ├── configs.py
@@ -272,7 +271,7 @@ python run_all.py
 
 ## Generated Outputs
 
-Running `run_all.py` creates the following outputs under `../outputs/`:
+All outputs are created under the repository-level `outputs/` directory when `run_all.py` is executed from `src/`.
 
 - `raw_metrics.csv`: detailed evaluation logs for all seeds and checkpoints
 - `aggregated_metrics.csv`: aggregated metrics with confidence intervals

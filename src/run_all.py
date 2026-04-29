@@ -27,10 +27,7 @@ def extract_greedy_policy(model, desc):
 
             if cell in {"S", "F"}:
                 action, _ = model.predict(state, deterministic=True)
-                if hasattr(action, "item"):
-                    action = int(action.item())
-                else:
-                    action = int(action)
+                action = int(action.item()) if hasattr(action, "item") else int(action)
                 policy[state] = action
 
     return policy
@@ -40,6 +37,8 @@ def main() -> None:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     figures_dir = os.path.join(OUTPUT_DIR, "figures")
     policy_dir = os.path.join(OUTPUT_DIR, "policies")
+    os.makedirs(figures_dir, exist_ok=True)
+    os.makedirs(policy_dir, exist_ok=True)
 
     all_runs = []
     final_models = {}
@@ -54,6 +53,9 @@ def main() -> None:
                 # On conserve le modèle de la seed 0 pour visualiser une politique apprise concrète.
                 if seed == 0:
                     final_models[(case_cfg.name, algo_cfg.name)] = model
+
+    if not all_runs:
+        raise RuntimeError("No runs were executed. Check ALGO_CONFIGS and CASE_CONFIGS.")
 
     raw_df = pd.concat(all_runs, ignore_index=True)
     raw_csv_path = os.path.join(OUTPUT_DIR, RAW_METRICS_FILENAME)
@@ -98,17 +100,16 @@ def main() -> None:
     )
 
     for case_cfg in CASE_CONFIGS:
-        dqn_model = final_models[(case_cfg.name, "DQN")]
-        ppo_model = final_models[(case_cfg.name, "PPO")]
-
-        dqn_policy = extract_greedy_policy(dqn_model, case_cfg.desc)
-        ppo_policy = extract_greedy_policy(ppo_model, case_cfg.desc)
+        policies = {}
+        for algo_cfg in ALGO_CONFIGS:
+            key = (case_cfg.name, algo_cfg.name)
+            if key in final_models:
+                policies[algo_cfg.name] = extract_greedy_policy(final_models[key], case_cfg.desc)
 
         plot_policy_comparison(
             case_name=case_cfg.name,
             desc=case_cfg.desc,
-            dqn_policy=dqn_policy,
-            ppo_policy=ppo_policy,
+            policies=policies,
             output_path=os.path.join(policy_dir, f"{case_cfg.name}_policy_comparison.png"),
         )
 
